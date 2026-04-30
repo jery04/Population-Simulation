@@ -72,7 +72,7 @@ _bebes_total = sum(_bebes_raw.values())
 PROB_BEBES = {k: v/_bebes_total for k,v in _bebes_raw.items()}
 
 # normalizar deseo hijos
-DESEO_RAW = {1:0.6,2:0.75,3:0.35,4:0.2,5:0.1,6:0.05}
+DESEO_RAW = {1:0.6,2:0.75,3:0.35,4:0.2,5:0.1,6:0.016,7:0.016,8:0.016}
 total = sum(DESEO_RAW.values())
 PROB_DESEO = {k:v/total for k,v in DESEO_RAW.items()}
 
@@ -100,7 +100,6 @@ def sample(dic):
 
     return items[-1][0]
 
-
 def lambda_solo(edad):
     media = prob_por_edad(edad, MEDIA_SOLO)
     return 1/media if media > 0 else 0
@@ -118,15 +117,26 @@ def sample_exponencial(lmbda):
 class Simulador:
 
     def __init__(self, H, M):
-        self.poblacion: List[Persona] = []
+        self.hombres: List[Persona] = []
+        self.mujeres: List[Persona] = []
         self.next_id = 0
 
         # inicialización
         for _ in range(H):
-            self.poblacion.append(self.crear_persona('H'))
+            self.agregar_persona(self.crear_persona('H'))
 
         for _ in range(M):
-            self.poblacion.append(self.crear_persona('M'))
+            self.agregar_persona(self.crear_persona('M'))
+
+    def agregar_persona(self, persona):
+        if persona.sexo == 'H':
+            self.hombres.append(persona)
+        else:
+            self.mujeres.append(persona)
+
+    @property
+    def poblacion(self):
+        return self.hombres + self.mujeres
 
     def crear_persona(self, sexo):
         p = Persona(
@@ -138,21 +148,40 @@ class Simulador:
         self.next_id += 1
         return p
 
-    # =====================
-    # PASO DE SIMULACION
-    # =====================
+    def run(self, meses=1200):
+        historia = []
+
+        for _ in range(meses):
+            self.step()
+            vivos = sum(1 for p in self.poblacion if p.viva)
+            historia.append(vivos)
+
+        return historia
 
     def step(self):
+
+        self.envejecer_poblacion()
+        self.aplicar_muertes()
+        self.reducir_tiempo_solo()
+        self.actualizar_deseo_pareja()
+        self.formar_parejas()
+        self.aplicar_rupturas()
+        self.procesar_embarazos()
+
+    def envejecer_poblacion(self):
 
         # 1. envejecer
         for p in self.poblacion:
             if p.viva:
                 p.envejecer()
 
+    def aplicar_muertes(self):
+
         # 2. muerte
         for p in self.poblacion:
             if not p.viva:
                 continue
+            
 
             tabla = PROB_MUERTE_H if p.sexo == 'H' else PROB_MUERTE_M
             if random.random() < prob_por_edad(p.edad, tabla):
@@ -164,15 +193,21 @@ class Simulador:
                     pareja.tiempo_solo_restante = sample_exponencial(lambda_solo(pareja.edad))
                     p.pareja = None
 
+    def reducir_tiempo_solo(self):
+
         # 3. reducir tiempo solo
         for p in self.poblacion:
             if p.tiempo_solo_restante > 0:
                 p.tiempo_solo_restante -= 1
 
+    def actualizar_deseo_pareja(self):
+
         # 4. deseo de pareja
         for p in self.poblacion:
             if p.viva:
                 p.quiere_pareja = random.random() < prob_por_edad(p.edad, PROB_QUERER_PAREJA)
+
+    def formar_parejas(self):
 
         # 5. formar parejas
         solteros = [p for p in self.poblacion if p.esta_disponible()]
@@ -195,6 +230,8 @@ class Simulador:
                 a.pareja = b
                 b.pareja = a
 
+    def aplicar_rupturas(self):
+
         # 6. rupturas
         for p in self.poblacion:
             if p.viva and p.pareja:
@@ -205,6 +242,8 @@ class Simulador:
 
                     p.tiempo_solo_restante = sample_exponencial(lambda_solo(p.edad))
                     pareja.tiempo_solo_restante = sample_exponencial(lambda_solo(pareja.edad))
+
+    def procesar_embarazos(self):
 
         # 7. embarazos
         nuevos = []
@@ -226,21 +265,8 @@ class Simulador:
                     p.hijos += num_bebes
                     p.pareja.hijos += num_bebes
 
-        self.poblacion.extend(nuevos)
-
-    # =====================
-    # EJECUTAR
-    # =====================
-
-    def run(self, meses=1200):
-        historia = []
-
-        for _ in range(meses):
-            self.step()
-            vivos = sum(1 for p in self.poblacion if p.viva)
-            historia.append(vivos)
-
-        return historia
+        for bebe in nuevos:
+            self.agregar_persona(bebe)
 
 
 # =========================
@@ -251,6 +277,8 @@ if __name__ == "__main__":
 
     sim = Simulador(H=100, M=100)
 
-    historia = sim.run(1200)
+    historia = sim.run(12)
 
     print("Población final:", historia[-1])
+    print(historia[:100])
+
