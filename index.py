@@ -66,7 +66,10 @@ PROB_RUPTURA = 0.2
 MEDIA_SOLO = [(12,15,3),(15,21,6),(21,35,6),
               (35,45,12),(45,60,24),(60,126,48)]
 
-PROB_BEBES = {1:0.7,2:0.18,3:0.08,4:0.04,5:0.02}
+# Normalizar para que sume exactamente 1.0
+_bebes_raw = {1:0.7,2:0.18,3:0.08,4:0.04,5:0.02}
+_bebes_total = sum(_bebes_raw.values())
+PROB_BEBES = {k: v/_bebes_total for k,v in _bebes_raw.items()}
 
 # normalizar deseo hijos
 DESEO_RAW = {1:0.6,2:0.75,3:0.35,4:0.2,5:0.1,6:0.05}
