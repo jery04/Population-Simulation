@@ -107,4 +107,6 @@ historia = [200, 205, 203, 198, ...]  # Population per month
 
 ---
 
-**Created with ❤️ by a simulation enthusiast** 🧬
+<p align="center">
+  <strong>Created with ❤️ by a simulation enthusiast</strong> 🧬
+</p>
