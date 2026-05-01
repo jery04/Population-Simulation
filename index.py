@@ -334,8 +334,8 @@ class Simulador:
 if __name__ == "__main__":
 
     sim = Simulador(H=100, M=100)
-    historia = sim.run(12)
+    historia = sim.run(24)
 
     #print("Población final:", historia[-1])
-    print(historia[:12])
+    print(historia[:24])
     
