@@ -95,7 +95,7 @@ class RandomSampler:
     def sample_exponencial(lmbda):
         if lmbda == 0:
             return 0
-        return random.expovariate(lmbda)
+        return random.expovariate(lmbda)/12  # Convertir de meses a años
 
 
 # MODELO
@@ -163,7 +163,7 @@ class Simulador:
 
     @property
     def poblacion(self):
-        return list(self.personas.values())
+        return [self.personas[i] for i in self.hombres.union(self.mujeres)]
 
     def crear_persona(self, sexo):
         p = Persona(
@@ -224,7 +224,6 @@ class Simulador:
                 p.envejecer()
 
     def aplicar_muertes(self):
-
         # 2. muerte
 
         for p in self.poblacion:
@@ -240,6 +239,11 @@ class Simulador:
                     pareja.pareja = None
                     pareja.tiempo_solo_restante = RandomSampler.sample_exponencial(RandomSampler.lambda_solo(pareja.edad))
                     p.pareja = None
+                
+                if p.sexo == 'H':
+                    self.hombres.discard(p.id)
+                else:
+                    self.mujeres.discard(p.id)
 
     def reducir_tiempo_solo(self):
 
@@ -254,7 +258,7 @@ class Simulador:
 
         # 4. deseo de pareja
         for p in self.poblacion:
-            if p.viva:
+            if p.esta_disponible():
                 p.quiere_pareja = random.random() < prob_por_edad(p.edad, PROB_QUERER_PAREJA)
 
     def formar_parejas(self):
@@ -285,12 +289,14 @@ class Simulador:
         # 6. rupturas
         for i in self.hombres:
             p = self.personas[i]
-            if p.viva and p.pareja:
+            if p.pareja:
                 if random.random() < PROB_RUPTURA:
                     pareja = p.pareja
                     p.pareja = None
                     pareja.pareja = None
 
+                    p.quiere_pareja = False
+                    pareja.quiere_pareja = False
                     p.tiempo_solo_restante = RandomSampler.sample_exponencial(RandomSampler.lambda_solo(p.edad))
                     pareja.tiempo_solo_restante = RandomSampler.sample_exponencial(RandomSampler.lambda_solo(pareja.edad))
 
@@ -323,19 +329,21 @@ class Simulador:
                     num_bebes = RandomSampler.sample(PROB_BEBES)
 
                     for _ in range(num_bebes):
-                        bebe = self.crear_bebe()
-                        self.embarazos.append(bebe)  # Agregar bebé a gestación con su tiempo de nacimiento
+                        bebe, time = self.crear_bebe()
+                        self.embarazos.append((bebe, time))  # Agregar bebé a gestación con su tiempo de nacimiento
 
                     p.hijos += num_bebes
                     p.pareja.hijos += num_bebes
+                    p.embarazo_restante = time  # meses de embarazo, convertido a años
+                    
 
 
 # EJECUCION
 if __name__ == "__main__":
 
     sim = Simulador(H=100, M=100)
-    historia = sim.run(24)
+    historia = sim.run(12)
 
     #print("Población final:", historia[-1])
-    print(historia[:24])
+    print(historia[:12])
     
