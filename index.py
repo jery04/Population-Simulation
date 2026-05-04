@@ -16,7 +16,7 @@ biological and social processes over time.
 
 import random              # Library for random numbers and probability distributions
 from dataclasses import dataclass   # Decorator to auto-generate methods for simple data classes
-from typing import Optional, List, Tuple   # Type hints: Optional (nullable), List (sequence), Tuple (fixed-size sequence)
+from typing import Optional, List, Tuple, Callable   # Type hints: Optional (nullable), List (sequence), Tuple (fixed-size sequence)
 
 
 def prob_por_edad(edad, tabla):
@@ -62,7 +62,6 @@ total = sum(DESEO_RAW.values())
 PROB_DESEO = {k:v/total for k,v in DESEO_RAW.items()}
 
 
-
 # RANDOM SAMPLER
 class RandomSampler:
     """Utilities for random sampling from probability distributions."""
@@ -100,6 +99,19 @@ class RandomSampler:
         if lmbda == 0:
             return 0
         return random.expovariate(lmbda)/12  # Convertir de meses a años
+    
+    @staticmethod
+    def salto_tiempo(lam=1.5, min_dias=1, max_anos=5):
+        """Return a random time jump (in years) sampled from an exponential
+        distribution with rate `lam`, constrained to fall between `min_dias`
+        and `max_anos`."""
+        min_t = min_dias / 365
+        max_t = max_anos
+
+        while True:
+            dt = random.expovariate(lam)
+            if min_t <= dt <= max_t:
+                return dt
 
 
 # MODELO
@@ -117,14 +129,20 @@ class Persona:
     embarazo_restante: float = 0.0  # meses
     viva: bool = True
 
-    def envejecer(self):
+    def envejecer(self, time):
         """Age the person by one month."""
-        self.edad += 1/12
+        self.edad += time
+        
         if self.embarazo_restante > 0:
-            self.embarazo_restante -= 1/12
+            self.embarazo_restante -= time
             if self.embarazo_restante < 0:
                 self.embarazo_restante = 0
-
+                       
+        if self.tiempo_solo_restante > 0:
+            self.tiempo_solo_restante -= time
+        elif self.tiempo_solo_restante < 0:
+            self.tiempo_solo_restante = 0
+            
     def esta_disponible(self):
         """Check if person is alive, single, and ready for a new relationship."""
         return (
@@ -154,7 +172,7 @@ class Simulador:
         self.personas: dict[int, Persona] = {}
         self.hombres: set[int] = set()
         self.mujeres: set[int] = set()
-        self.embarazos: List[Tuple[Persona, float]] = []  # (bebé, tiempo restante hasta nacer)
+        self.gestation: set[int] = set()
         self.next_id = 0
 
         # inicialización
@@ -164,18 +182,22 @@ class Simulador:
         for _ in range(M):
             self.agregar_persona(self.crear_persona('M'))
 
-    def agregar_persona(self, persona):
-        """Add a person to the simulation and track by sex."""
-        self.personas[persona.id] = persona
-        if persona.sexo == 'H':
-            self.hombres.add(persona.id)
-        else:
-            self.mujeres.add(persona.id)
-
     @property
     def poblacion(self):
         """Return list of all living persons in the simulation."""
         return [self.personas[i] for i in self.hombres.union(self.mujeres)]
+
+    # GESTIONAR PERSONAS ------------------------
+    def agregar_persona(self, persona):
+        """Add a person to the simulation and track by sex."""
+        self.personas[persona.id] = persona
+        
+        if persona.edad < 0:
+            self.gestation.add(persona.id)
+        elif persona.sexo == 'H':
+            self.hombres.add(persona.id)
+        else:
+            self.mujeres.add(persona.id)
 
     def crear_persona(self, sexo):
         """Create a new person with random age and desired number of children."""
@@ -188,63 +210,113 @@ class Simulador:
         self.next_id += 1
         return p
 
-    def crear_bebe(self):
+    def crear_bebe(self, gest_time):
         """Create a new baby with random sex and gestation time."""
         # Sexo aleatorio: 0 = hombre, 1 = mujer
         sexo = 'H' if random.random() < 0.5 else 'M' 
 
-        meses = random.choice([7, 8, 9, 10])
-        tiempo = meses / 12
-
         bebe = Persona(
             id=self.next_id,
-            edad=0,  # siempre nace con edad 0
+            edad= -gest_time,  # siempre nace con edad: - gest_time
             sexo=sexo,
             deseo_hijos=RandomSampler.sample(PROB_DESEO)
         )
-
         self.next_id += 1
-        return bebe, tiempo
+        return bebe
 
-    def run(self, meses=1200):
-        """Run simulation for specified number of months and return population history."""
+    # CREAR AGENDA -------------------------------
+    def _generar_eventos_tipo(
+        self,
+        funcion: Callable,
+        lam: float,
+        anos_simulacion: float
+    ) -> List[Tuple[float, Callable]]:
+
+        t = 0.0
+        agenda = []
+
+        while t < anos_simulacion:
+            dt = RandomSampler.salto_tiempo(lam=lam)
+            t += dt
+
+            if t > anos_simulacion:
+                break
+
+            agenda.append((t, funcion))
+
+        return agenda
+
+    def gestar_agenda_eventos(self, anos_simulacion: float):
+
+        tipos_eventos = [
+            (self.aplicar_muertes, 0.05),
+            (self.actualizar_deseo_pareja, 1.0),
+            (self.aplicar_rupturas, 0.2),
+            (self.formar_parejas, 0.5),
+            (self.procesar_embarazos, 0.1),
+        ]
+
+        eventos_globales: List[Tuple[float, Callable]] = []
+
+        for funcion, lam in tipos_eventos:
+            agenda = self._generar_eventos_tipo(
+                funcion=funcion,
+                lam=lam,
+                anos_simulacion=anos_simulacion
+            )
+            eventos_globales.extend(agenda)
+
+        # Merge ordenado
+        eventos_globales.sort(key=lambda x: x[0])
+
+        return eventos_globales
+
+    def run(self, anos=100):
+        """
+        Ejecuta la simulación y devuelve historia de población viva.
+        """
+
         historia = []
+        last_time=0
+        agenda_eventos = self.gestar_agenda_eventos(anos)
 
-        for _ in range(meses):
-            self.step()
-            vivos = sum(1 for p in self.poblacion if p.viva)
-            historia.append(vivos)
+        for t, funcion in agenda_eventos:
+            # Ejecutar evento
+            diff = t - last_time
+            self.envejecer_poblacion(diff)
+            self.procesar_gestaciones(diff)
+            funcion(diff)
+            historia.append(len(self.poblacion))
+            last_time = t
 
         return historia
 
-    def step(self):
-        """Execute one month of simulation."""
-        self.procesar_gestaciones()      # 1. nacen bebés (antes de todo)
-        self.envejecer_poblacion()       # 2. todos envejecen
-        self.aplicar_muertes()           # 3. algunos mueren (afecta relaciones)
-
-        self.reducir_tiempo_solo()       # 4. pasa el tiempo emocional/social
-        self.actualizar_deseo_pareja()   # 5. cambia el deseo (depende de edad actual)
-
-        self.aplicar_rupturas()          # 6. relaciones existentes pueden romperse
-        self.formar_parejas()            # 7. nuevos emparejamientos
-
-        self.procesar_embarazos()        # 8. embarazos (requiere pareja estable)
-
-    def envejecer_poblacion(self):
+    # ACTUALIZAR ----------------------------------
+    def envejecer_poblacion(self, time):
         """Age all living persons by one month."""
         # 1. envejecer
         for p in self.poblacion:
-            if p.viva:
-                p.envejecer()
+            p.envejecer(time)
 
-    def aplicar_muertes(self):
+    def procesar_gestaciones(self, time):
+        """Process ongoing gestations and add born babies to the population."""
+        # 6.5. Procesar gestaciones: reducir el tiempo restante y crear personas cuando llegue a 0
+        
+        for item in self.gestation.copy():  # Copia para evitar modificar el set durante la iteración
+            bebe = self.personas[item]
+            bebe.envejecer(time)
+
+            if bebe.edad >= 0:
+                # Bebé completó gestación, agregarlo a la población
+                self.agregar_persona(bebe)
+                self.gestation.discard(bebe.id)  # Quitar de gestación
+
+    # EVENTOS -------------------------------------
+    def aplicar_muertes(self, time):
         """Apply mortality and handle relationship dissolution from deaths."""
         # 2. muerte
 
         for p in self.poblacion:
-            if not p.viva:
-                continue
 
             tabla = PROB_MUERTE_H if p.sexo == 'H' else PROB_MUERTE_M
             if random.random() < prob_por_edad(p.edad, tabla):
@@ -261,23 +333,14 @@ class Simulador:
                 else:
                     self.mujeres.discard(p.id)
 
-    def reducir_tiempo_solo(self):
-        """Decrease solitude time for persons in recovery from relationships."""
-        # 3. reducir tiempo solo
-        for p in self.poblacion:
-            if p.tiempo_solo_restante > 0:
-                p.tiempo_solo_restante -= 1/12
-            elif p.tiempo_solo_restante < 0:
-                p.tiempo_solo_restante = 0
-
-    def actualizar_deseo_pareja(self):
+    def actualizar_deseo_pareja(self, time):
         """Update desire for partnership based on age and availability."""
         # 4. deseo de pareja
         for p in self.poblacion:
             if p.esta_disponible():
                 p.quiere_pareja = random.random() < prob_por_edad(p.edad, PROB_QUERER_PAREJA)
 
-    def formar_parejas(self):
+    def formar_parejas(self, time):
         """Match available individuals who desire partnerships based on age compatibility."""
         # Filtrar personas disponibles y con deseo de pareja
         hombres = [self.personas[i] for i in self.hombres if self.personas[i].esta_disponible() and self.personas[i].quiere_pareja]
@@ -301,7 +364,7 @@ class Simulador:
                     m.pareja = h
                     break  # salir del bucle, ya emparejado
 
-    def aplicar_rupturas(self):
+    def aplicar_rupturas(self, time):
         """Randomly dissolve some partnerships and set solitude recovery time."""
         # 6. rupturas
         for i in self.hombres:
@@ -317,24 +380,7 @@ class Simulador:
                     p.tiempo_solo_restante = RandomSampler.sample_exponencial(RandomSampler.lambda_solo(p.edad))
                     pareja.tiempo_solo_restante = RandomSampler.sample_exponencial(RandomSampler.lambda_solo(pareja.edad))
 
-    def procesar_gestaciones(self):
-        """Process ongoing gestations and add born babies to the population."""
-        # 6.5. Procesar gestaciones: reducir el tiempo restante y crear personas cuando llegue a 0
-        embarazos_restantes = []
-        
-        for bebe, tiempo_restante in self.embarazos:
-            bebe.envejecer()
-
-            if tiempo_restante - bebe.edad <= 0:
-                # Bebé completó gestación, agregarlo a la población
-                self.agregar_persona(bebe)
-            else:
-                # Aún en gestación
-                embarazos_restantes.append((bebe, tiempo_restante))
-        
-        self.embarazos = embarazos_restantes
-
-    def procesar_embarazos(self):
+    def procesar_embarazos(self, time):
         """Initiate pregnancies for partnered women and add to gestations list."""
         # 7. embarazos
 
@@ -346,23 +392,22 @@ class Simulador:
 
                 if random.random() < prob:
                     num_bebes = RandomSampler.sample(PROB_BEBES)
-
+                    
+                    gest_time = random.uniform(7, 10) / 12   # any value between 7.0 and 10.0
                     for _ in range(num_bebes):
-                        bebe, time = self.crear_bebe()
-                        self.embarazos.append((bebe, time))  # Agregar bebé a gestación con su tiempo de nacimiento
+                        self.agregar_persona(self.crear_bebe(gest_time))  # Agregar bebé a gestación
 
                     p.hijos += num_bebes
                     p.pareja.hijos += num_bebes
-                    p.embarazo_restante = time  # meses de embarazo, convertido a años
+                    p.embarazo_restante = gest_time  # meses de embarazo, convertido a años
                     
-
 
 # EJECUCION
 if __name__ == "__main__":
 
     sim = Simulador(H=100, M=100)
-    historia = sim.run(12)
+    historia = sim.run(120)
 
     #print("Población final:", historia[-1])
-    print(historia[:12])
+    print(historia[-1])
     
