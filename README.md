@@ -29,13 +29,13 @@ This project simulates the evolution of a population over time by modeling indiv
 
 ### Core Classes
 
-**`Persona`** - Individual entity with:
-- `edad` (age in years)
-- `sexo` (gender: 'H' for hombre/male, 'M' for mujer/female)
-- `pareja` (current partner reference)
-- `hijos` (number of children)
-- `deseo_hijos` (desired number of children)
-- `viva` (alive status)
+**`Person`** - Individual entity with:
+- `age` (age in years)
+- `sex` (gender: 'H' for hombre/male, 'M' for mujer/female)
+- `has_partner` (current partner reference)
+- `children_count` (number of children)
+- `child_desire_count` (desired number of children)
+- `is_alive` (alive status)
 
 **`Simulador`** - Population simulator that:
 - Maintains populations of males and females
