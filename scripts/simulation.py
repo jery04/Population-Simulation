@@ -43,7 +43,7 @@ class Simulador:
         """Return list of all living persons in the simulation."""
         return [self.people[i] for i in self.male_group.union(self.female_group)]
 
-    # Manage people ------------------------
+    # MANAGE PEOPLE -------------------------------------------------------------------
     def add_person(self, persona):
         """Add a person to the simulation and track by sex."""
         # Store person and classify by age/sex
@@ -83,7 +83,7 @@ class Simulador:
         self.next_id += 1
         return bebe
 
-    # Build schedule -------------------------------
+    # BUILD SCHEDULE -------------------------------------------------------------------
     def build_events_by_type(
         self,
         funcion: Callable,
@@ -160,7 +160,7 @@ class Simulador:
 
         return history
 
-    # ACTUALIZAR ----------------------------------
+    # UPDATES -------------------------------------------------------------------
     def age_people(self, time):
         """Age all living persons by one month."""
         # Advance age for all living individuals
@@ -180,7 +180,7 @@ class Simulador:
                 self.add_person (bebe)
                 self.gestation.discard(bebe.id)  # Remove from gestation tracking
 
-    # EVENTOS -------------------------------------
+    # EVENT HANDLERS -------------------------------------------------------------------
     def handle_deaths(self, time):
         """Apply mortality and handle relationship dissolution from deaths."""
         # Apply mortality based on age and sex

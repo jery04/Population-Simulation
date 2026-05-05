@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt  # chart rendering
 import statistics  # mean/stdev calculations
 from scripts.simulation import Simulador  # simulation engine
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent # Project root directory
 
+# UTILS -------------------------------------------------------------------
 def resample_population(history: list[tuple[float, int]], years: int) -> tuple[list[int], list[int]]:
     """Resample population history on a yearly grid using last-known values."""
     # Build a yearly grid and carry forward the last known population.
@@ -46,19 +47,23 @@ def build_chart(
     sigma: int = 1,
     plot_all: bool = False,
     show: bool = False,
-) -> None:
+) -> float:
     """Run the simulation multiple times and plot population statistics over time.
 
     If `runs` == 1 the behaviour is identical to before. For `runs` > 1 the
     function executes the simulation repeatedly, collects the population time
     series, computes mean and standard deviation per year and plots either
     the mean with ±sigma bands or all runs in grey + mean in red.
+    Returns the mean final population across all runs.
     """
+
+    final_populations: list[int] = []
 
     if runs <= 1:
         # Single run keeps the original event timeline.
         simulation = Simulador(H=male_count, M=female_count)
         history = simulation.run(years)
+        final_populations.append(history[-1][1] if history else 0)
         timeline = [t for t, _ in history]
         population = [p for _, p in history]
 
@@ -68,18 +73,20 @@ def build_chart(
     else:
         all_populations: list[list[float]] = []
         timeline = None
-        print(f"Ejecutando {runs} corridas de la simulación ({years} años cada una)...")
+        print(f"Running {runs} simulation runs ({years} years each)...")
+
         for i in range(runs):
-            print(f"  Corrida {i+1}/{runs}...", end="\r")
+            print(f"  Run {i+1}/{runs}...", end="\r")
             sim = Simulador(H=male_count, M=female_count)
             history = sim.run(years)
+            final_populations.append(history[-1][1] if history else 0)
             if timeline is None:
                 # Resample to a shared yearly grid for comparison.
                 timeline, pops = resample_population(history, years)
             else:
                 _, pops = resample_population(history, years)
             all_populations.append(pops)
-        print(f"  Corrida {runs}/{runs}... ✓")
+        print(f"  Run {runs}/{runs}... ✓")
 
         # Transpose to compute statistics per year.
         per_year = list(zip(*all_populations))
@@ -132,5 +139,4 @@ def build_chart(
     if show or output is None:
         plt.show()
 
-
-
+    return statistics.mean(final_populations) if final_populations else 0.0
