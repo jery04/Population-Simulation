@@ -20,6 +20,8 @@ from typing import Optional, List, Tuple, Callable   # Type hints: Optional (nul
 
 
 def prob_by_age(age, tabla):
+    """Return the probability for an age range lookup table."""
+    # Look up probability based on age bracket
     for a, b, p in tabla:
         if a <= age < b:
             return p
@@ -71,12 +73,14 @@ class RandomSampler:
         """Sample a value from a dictionary of probabilities."""
         items = list(dic.items())
         if not items:
-            raise ValueError("sample() no puede recibir un diccionario vacío")
+            raise ValueError("sample() cannot receive an empty dictionary")
 
+        # Calculate total probability
         total = sum(prob for _, prob in items)
         if total <= 0:
-            raise ValueError("sample() requiere probabilidades positivas")
+            raise ValueError("sample() requires positive probabilities")
 
+        # Generate random threshold and accumulate probabilities
         umbral = random.random() * total
         acumulado = 0.0
 
@@ -90,24 +94,28 @@ class RandomSampler:
     @staticmethod
     def lambda_solo(age):
         """Calculate the rate parameter for exponential distribution of solitude time."""
+        # Compute lambda for exponential distribution based on age group
         media = prob_by_age(age, MEDIA_SOLO)
         return 1/media if media > 0 else 0
 
     @staticmethod
     def sample_exponencial(lmbda):
         """Sample from exponential distribution and convert months to years."""
+        # Sample from exponential distribution
         if lmbda == 0:
             return 0
-        return random.expovariate(lmbda)/12  # Convertir de meses a años
+        return random.expovariate(lmbda)/12  # Convert months to years
     
     @staticmethod
     def time_step(lam=1.5, min_dias=1, max_anos=5):
         """Return a random time jump (in years) sampled from an exponential
         distribution with rate `lam`, constrained to fall between `min_dias`
         and `max_anos`."""
+        # Convert constraints to years
         min_t = min_dias / 365
         max_t = max_anos
 
+        # Sample until we get a value within bounds
         while True:
             dt = random.expovariate(lam)
             if min_t <= dt <= max_t:
@@ -125,19 +133,22 @@ class Person:
     children_count: int = 0
     child_desire_count: int = 1
     desires_partner: bool = False
-    time_left_single : float = 0.0  # meses
-    time_left_in_pregnancy: float = 0.0  # meses
+    time_left_single : float = 0.0  # months
+    time_left_in_pregnancy: float = 0.0  # months
     is_alive: bool = True
 
     def age_up (self, time):
         """Age the person by one month."""
+        # Increment age
         self.age += time
         
+        # Decrement pregnancy timer if active
         if self.time_left_in_pregnancy > 0:
             self.time_left_in_pregnancy -= time
             if self.time_left_in_pregnancy < 0:
                 self.time_left_in_pregnancy = 0
-                       
+        
+        # Decrement solitude timer if active
         if self.time_left_single  > 0:
             self.time_left_single  -= time
         elif self.time_left_single  < 0:
@@ -145,6 +156,7 @@ class Person:
             
     def is_single(self):
         """Check if person is alive, single, and ready for a new relationship."""
+        # Verify all conditions: alive, no partner, solitude period expired
         return (
             self.is_alive and
             self.has_partner is None and
@@ -153,12 +165,16 @@ class Person:
 
     def is_able_to_reproduce(self):
         """Check if person can have children based on sex, status, and desires."""
+        # Must be alive and female
         if not self.is_alive or self.sex != "M":
             return False
+        # Must have a partner
         if self.has_partner is None:
             return False
+        # Cannot be currently pregnant
         if self.time_left_in_pregnancy > 0:
             return False
+        # Check if child count limit not reached
         limite = min(self.child_desire_count, self.has_partner.child_desire_count)
         return self.children_count < limite
 
@@ -169,13 +185,14 @@ class Simulador:
 
     def __init__(self, H, M):
         """Initialize simulator with H males and M females."""
+        # Initialize data structures for tracking individuals
         self.people: dict[int, Person] = {}
         self.male_group: set[int] = set()
         self.female_group: set[int] = set()
         self.gestation: set[int] = set()
         self.next_id = 0
 
-        # inicialización
+        # Create initial population of males and females
         for _ in range(H):
             self.add_person(self.create_person('H'))
 
@@ -187,9 +204,10 @@ class Simulador:
         """Return list of all living persons in the simulation."""
         return [self.people[i] for i in self.male_group.union(self.female_group)]
 
-    # GESTIONAR PERSONAS ------------------------
+    # Manage people ------------------------
     def add_person(self, persona):
         """Add a person to the simulation and track by sex."""
+        # Store person and classify by age/sex
         self.people[persona.id] = persona
         
         if persona.age < 0:
@@ -201,6 +219,7 @@ class Simulador:
 
     def create_person(self, sex):
         """Create a new person with random age and desired number of children."""
+        # Generate new person with random age and fertility desires
         p = Person(
             id=self.next_id,
             age=random.uniform(0,100),
@@ -212,19 +231,20 @@ class Simulador:
 
     def create_baby(self, gest_time):
         """Create a new baby with random sex and gestation time."""
-        # Sexo aleatorio: 0 = hombre, 1 = mujer
+        # Randomly assign sex (50/50 probability)
         sex = 'H' if random.random() < 0.5 else 'M' 
 
+        # Create baby with negative age to track gestation period
         bebe = Person(
             id=self.next_id,
-            age= -gest_time,  # siempre nace con age: - gest_time
+            age= -gest_time,  # The baby starts with a negative age equal to gestation time.
             sex=sex,
             child_desire_count=RandomSampler.sample(PROB_DESEO)
         )
         self.next_id += 1
         return bebe
 
-    # CREAR AGENDA -------------------------------
+    # Build schedule -------------------------------
     def build_events_by_type(
         self,
         funcion: Callable,
@@ -232,6 +252,8 @@ class Simulador:
         anos_simulacion: float
     ) -> List[Tuple[float, Callable]]:
 
+        """Build a timeline of repeated events for a single handler."""
+        # Generate random event times throughout the simulation period
         t = 0.0
         agenda = []
 
@@ -247,7 +269,8 @@ class Simulador:
         return agenda
 
     def build_event_schedule(self, anos_simulacion: float):
-
+        """Build the full sorted event schedule for the simulation."""
+        # Define event types with their frequency rates
         tipos_eventos = [
             (self.handle_deaths, 0.05),
             (self.partner_desire, 1.0),
@@ -258,6 +281,7 @@ class Simulador:
 
         eventos_globales: List[Tuple[float, Callable]] = []
 
+        # Generate event timeline for each event type
         for funcion, lam in tipos_eventos:
             agenda = self.build_events_by_type(
                 funcion=funcion,
@@ -266,67 +290,72 @@ class Simulador:
             )
             eventos_globales.extend(agenda)
 
-        # Merge ordenado
+        # Merge and sort all events by time
         eventos_globales.sort(key=lambda x: x[0])
 
         return eventos_globales
 
     def run(self, anos=100):
-        """
-        Ejecuta la simulación y devuelve historia de población is_alive.
-        """
-
-        historia = []
+        """Run the simulation and return the population history."""
+        # Initialize history tracker and event schedule
+        history = []
         last_time=0
         agenda_eventos = self.build_event_schedule(anos)
 
+        # Process each event in chronological order
         for t, funcion in agenda_eventos:
             diff = t - last_time
+            # Age people and process pregnancies between events
             self.age_people(diff)
             self.update_gestations(diff)
+            # Execute the current event handler
             funcion(diff)
-            historia.append(len(self.population))
+            # Record population size at this moment
+            history.append(len(self.population))
             last_time = t
 
-        return historia
+        return history
 
     # ACTUALIZAR ----------------------------------
     def age_people(self, time):
         """Age all living persons by one month."""
-        # 1. age_up 
+        # Advance age for all living individuals
         for p in self.population:
             p.age_up (time)
 
     def update_gestations(self, time):
         """Process ongoing gestations and add born babies to the population."""
-        # 6.5. Procesar gestaciones: reducir el tiempo restante y crear people cuando llegue a 0
-        
-        for item in self.gestation.copy():  # Copia para evitar modificar el set durante la iteración
+        # Age all fetuses and handle births
+        for item in self.gestation.copy():  # Copy the set to avoid mutating it during iteration
             bebe = self.people[item]
             bebe.age_up (time)
 
+            # Check if baby has completed gestation period
             if bebe.age >= 0:
-                # Bebé completó gestación, agregarlo a la población
+                # Add newborn to population groups
                 self.add_person (bebe)
-                self.gestation.discard(bebe.id)  # Quitar de gestación
+                self.gestation.discard(bebe.id)  # Remove from gestation tracking
 
     # EVENTOS -------------------------------------
     def handle_deaths(self, time):
         """Apply mortality and handle relationship dissolution from deaths."""
-        # 2. muerte
-
+        # Apply mortality based on age and sex
         for p in self.population:
-
+            # Select appropriate mortality table by sex
             tabla = PROB_MUERTE_H if p.sex == 'H' else PROB_MUERTE_M
             if random.random() < prob_by_age(p.age, tabla):
+                # Mark person as deceased
                 p.is_alive = False
 
+                # If deceased had a partner, end their relationship
                 if p.has_partner:
                     has_partner = p.has_partner
                     has_partner.has_partner = None
+                    # Set recovery period for surviving partner
                     has_partner.time_left_single  = RandomSampler.sample_exponencial(RandomSampler.lambda_solo(has_partner.age))
                     p.has_partner = None
                 
+                # Remove from sex-specific groups
                 if p.sex == 'H':
                     self.male_group.discard(p.id)
                 else:
@@ -334,46 +363,52 @@ class Simulador:
 
     def partner_desire(self, time):
         """Update desire for partnership based on age and availability."""
-        # 4. deseo de has_partner
+        # Update desires for single individuals based on age-specific probabilities
         for p in self.population:
             if p.is_single():
                 p.desires_partner = random.random() < prob_by_age(p.age, PROB_QUERER_PAREJA)
 
     def match_couples(self, time):
         """Match available individuals who desire partnerships based on age compatibility."""
-        # Filtrar people disponibles y con deseo de has_partner
+        # Filter eligible single individuals seeking partners
         male_group = [self.people[i] for i in self.male_group if self.people[i].is_single() and self.people[i].desires_partner]
         female_group = [self.people[i] for i in self.female_group if self.people[i].is_single() and self.people[i].desires_partner]
 
+        # Randomize order to vary matching outcomes
         random.shuffle(male_group)
         random.shuffle(female_group)
 
+        # Attempt to form couples based on age compatibility
         for h in male_group:
-            # Cada hombre intenta con varias female_group, no solo con la mejor
+            # Each male tries multiple candidates instead of only the first one
             for m in female_group:
                 if not m.is_single():
                     continue
 
+                # Compute age difference and matching probability
                 diff = abs(h.age - m.age)
                 p = prob_by_age(diff, PROB_FORMAR_PAREJA)
 
-                # Aumentar probabilidad de éxito multiplicando por un factor
-                if random.random() < p:  # factor > 1 aumenta colisiones
+                # Form couple if random check passes
+                if random.random() < p:
                     h.has_partner = m
                     m.has_partner = h
-                    break  # salir del bucle, ya emparejado
+                    break  # Stop once the couple is formed
 
     def handle_breakups(self, time):
         """Randomly dissolve some partnerships and set solitude recovery time."""
-        # 6. rupturas
+        # Randomly end some active relationships
         for i in self.male_group:
             p = self.people[i]
             if p.has_partner:
+                # Check if relationship breaks based on probability
                 if random.random() < PROB_RUPTURA:
                     has_partner = p.has_partner
+                    # Sever relationship on both sides
                     p.has_partner = None
                     has_partner.has_partner = None
 
+                    # Reset partnership desires and set solitude recovery period
                     p.desires_partner = False
                     has_partner.desires_partner = False
                     p.time_left_single  = RandomSampler.sample_exponencial(RandomSampler.lambda_solo(p.age))
@@ -381,31 +416,34 @@ class Simulador:
 
     def handle_pregnancies(self, time):
         """Initiate pregnancies for partnered women and add to gestations list."""
-        # 7. embarazos
-
+        # Process pregnancy events for eligible women
         for i in self.female_group:
             p = self.people[i]
             if p.is_able_to_reproduce():
-
+                # Check pregnancy probability based on age
                 prob = prob_by_age(p.age, PROB_EMBARAZO)
 
                 if random.random() < prob:
+                    # Determine number of babies (singleton, twins, etc.)
                     num_bebes = RandomSampler.sample(PROB_BEBES)
                     
-                    gest_time = random.uniform(7, 10) / 12   # any value between 7.0 and 10.0
+                    # Generate random gestation period (7-10 months converted to years)
+                    gest_time = random.uniform(7, 10) / 12
+                    # Create and add each baby to gestation tracking
                     for _ in range(num_bebes):
-                        self.add_person (self.create_baby(gest_time))  # Agregar bebé a gestación
+                        self.add_person (self.create_baby(gest_time))
 
+                    # Update child counts for both parents
                     p.children_count += num_bebes
                     p.has_partner.children_count += num_bebes
-                    p.time_left_in_pregnancy = gest_time  # meses de embarazo, convertido a años
+                    # Set pregnancy recovery period
+                    p.time_left_in_pregnancy = gest_time
                     
 
 # EJECUCION
 if __name__ == "__main__":
 
     sim = Simulador(H=100, M=100)
-    historia = sim.run(100)
+    history = sim.run(100)
 
-    print("Población final:", historia[-1])
-    
+    print("Población final:", history[-1])
