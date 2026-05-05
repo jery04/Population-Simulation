@@ -1,185 +1,24 @@
-"""
-Population dynamics simulator.
+"""Main engine for simulating population dynamics over time."""
 
-This script models a simplified society of men and women with attributes such as
-age, partner status, fertility, and mortality. It includes probabilistic rules for:
-
-- Aging and death by sex and age group
-- Pair formation and breakups
-- Periods of solitude after relationship loss
-- Pregnancy likelihood and gestation
-- Birth of children with randomized traits
-
-The simulation uses probability tables and random sampling to approximate
-biological and social processes over time.
-"""
-
-import random              # Library for random numbers and probability distributions
-from dataclasses import dataclass   # Decorator to auto-generate methods for simple data classes
-from typing import Optional, List, Tuple, Callable   # Type hints: Optional (nullable), List (sequence), Tuple (fixed-size sequence)
-
-
-def prob_by_age(age, tabla):
-    """Return the probability for an age range lookup table."""
-    # Look up probability based on age bracket
-    for a, b, p in tabla:
-        if a <= age < b:
-            return p
-    return 0.0
+import random  # Random number utilities for stochastic events.
+from typing import List, Tuple, Callable  # Type hints for schedules and callables.
+from scripts.person import Person  # Population entity model.
+from scripts.sampler import RandomSampler  # Random distribution sampling helpers.
+from scripts.table import (  # Probability tables and lookup helper.
+    PROB_MUERTE_H,
+    PROB_MUERTE_M,
+    PROB_EMBARAZO,
+    PROB_QUERER_PAREJA,
+    PROB_FORMAR_PAREJA,
+    PROB_RUPTURA,
+    MEDIA_SOLO,
+    PROB_BEBES,
+    PROB_DESEO,
+    prob_by_age,
+)
 
 
-# Probability of death for males by age range (annualized rates)
-PROB_MUERTE_H = [(0,12,0.25/12),(12,45,0.1/12),(45,76,0.3/12),(76,126,0.7/12)]
-
-# Probability of death for females by age range (annualized rates)
-PROB_MUERTE_M = [(0,12,0.25/12),(12,45,0.15/12),(45,76,0.35/12),(76,126,0.65/12)]
-
-# Probability of pregnancy by age range
-PROB_EMBARAZO = [(12,15,0.2),(15,21,0.45),(21,35,0.8),(35,45,0.4),(45,60,0.2),(60,126,0.05)]
-
-# Probability of wanting a partner by age range
-PROB_QUERER_PAREJA = [(12,15,0.6),(15,21,0.65),(21,35,0.8),(35,45,0.6),(45,60,0.5),(60,126,0.2)]
-
-# Probability of forming a couple depending on age difference
-PROB_FORMAR_PAREJA = [(0,5,0.45),(5,10,0.4),(10,15,0.35),(15,20,0.25),(20,999,0.15)]
-
-# Probability of breakup (constant across ages)
-PROB_RUPTURA = 0.2
-
-# Average time spent alone after breakup, by age range (in months)
-MEDIA_SOLO = [(12,15,3),(15,21,6),(21,35,6),(35,45,12),(45,60,24),(60,126,48)]
-
-# Raw distribution of number of babies per pregnancy (weights)
-_bebes_raw = {1:0.7,2:0.18,3:0.08,4:0.04,5:0.02}
-
-# Normalize so probabilities sum exactly to 1.0
-_bebes_total = sum(_bebes_raw.values())
-PROB_BEBES = {k: v/_bebes_total for k,v in _bebes_raw.items()}
-
-# Raw distribution of desired number of children
-DESEO_RAW = {1:0.6,2:0.75,3:0.35,4:0.2,5:0.1,6:0.016,7:0.016,8:0.016}
-
-# Normalize so probabilities sum exactly to 1.0
-total = sum(DESEO_RAW.values())
-PROB_DESEO = {k:v/total for k,v in DESEO_RAW.items()}
-
-
-# RANDOM SAMPLER
-class RandomSampler:
-    """Utilities for random sampling from probability distributions."""
-    
-    @staticmethod
-    def sample(dic):
-        """Sample a value from a dictionary of probabilities."""
-        items = list(dic.items())
-        if not items:
-            raise ValueError("sample() cannot receive an empty dictionary")
-
-        # Calculate total probability
-        total = sum(prob for _, prob in items)
-        if total <= 0:
-            raise ValueError("sample() requires positive probabilities")
-
-        # Generate random threshold and accumulate probabilities
-        umbral = random.random() * total
-        acumulado = 0.0
-
-        for valor, prob in items:
-            acumulado += prob
-            if umbral < acumulado:
-                return valor
-
-        return items[-1][0]
-
-    @staticmethod
-    def lambda_solo(age):
-        """Calculate the rate parameter for exponential distribution of solitude time."""
-        # Compute lambda for exponential distribution based on age group
-        media = prob_by_age(age, MEDIA_SOLO)
-        return 1/media if media > 0 else 0
-
-    @staticmethod
-    def sample_exponencial(lmbda):
-        """Sample from exponential distribution and convert months to years."""
-        # Sample from exponential distribution
-        if lmbda == 0:
-            return 0
-        return random.expovariate(lmbda)/12  # Convert months to years
-    
-    @staticmethod
-    def time_step(lam=1.5, min_dias=1, max_anos=5):
-        """Return a random time jump (in years) sampled from an exponential
-        distribution with rate `lam`, constrained to fall between `min_dias`
-        and `max_anos`."""
-        # Convert constraints to years
-        min_t = min_dias / 365
-        max_t = max_anos
-
-        # Sample until we get a value within bounds
-        while True:
-            dt = random.expovariate(lam)
-            if min_t <= dt <= max_t:
-                return dt
-
-
-# MODELO
-@dataclass
-class Person:
-    """Represents an individual in the population with demographic and social attributes."""
-    id: int
-    age: float  # años
-    sex: str  # 'H' o 'M'
-    has_partner: Optional["Person"] = None
-    children_count: int = 0
-    child_desire_count: int = 1
-    desires_partner: bool = False
-    time_left_single : float = 0.0  # months
-    time_left_in_pregnancy: float = 0.0  # months
-    is_alive: bool = True
-
-    def age_up (self, time):
-        """Age the person by one month."""
-        # Increment age
-        self.age += time
-        
-        # Decrement pregnancy timer if active
-        if self.time_left_in_pregnancy > 0:
-            self.time_left_in_pregnancy -= time
-            if self.time_left_in_pregnancy < 0:
-                self.time_left_in_pregnancy = 0
-        
-        # Decrement solitude timer if active
-        if self.time_left_single  > 0:
-            self.time_left_single  -= time
-        elif self.time_left_single  < 0:
-            self.time_left_single  = 0
-            
-    def is_single(self):
-        """Check if person is alive, single, and ready for a new relationship."""
-        # Verify all conditions: alive, no partner, solitude period expired
-        return (
-            self.is_alive and
-            self.has_partner is None and
-            self.time_left_single  <= 0
-        )
-
-    def is_able_to_reproduce(self):
-        """Check if person can have children based on sex, status, and desires."""
-        # Must be alive and female
-        if not self.is_alive or self.sex != "M":
-            return False
-        # Must have a partner
-        if self.has_partner is None:
-            return False
-        # Cannot be currently pregnant
-        if self.time_left_in_pregnancy > 0:
-            return False
-        # Check if child count limit not reached
-        limite = min(self.child_desire_count, self.has_partner.child_desire_count)
-        return self.children_count < limite
-
-
-# SIMULADOR
+# SIMULATOR ----------------------------------
 class Simulador:
     """Main simulation engine for population dynamics."""
 
@@ -296,22 +135,27 @@ class Simulador:
         return eventos_globales
 
     def run(self, anos=100):
-        """Run the simulation and return the population history."""
+        """Run the simulation and return the population history as list of (time, population)."""
+        
         # Initialize history tracker and event schedule
-        history = []
-        last_time=0
+        history: List[Tuple[float, int]] = [(0.0, len(self.population))]
+        
+        last_time = 0.0
         agenda_eventos = self.build_event_schedule(anos)
 
         # Process each event in chronological order
         for t, funcion in agenda_eventos:
             diff = t - last_time
+            
             # Age people and process pregnancies between events
             self.age_people(diff)
             self.update_gestations(diff)
+            
             # Execute the current event handler
             funcion(diff)
+            
             # Record population size at this moment
-            history.append(len(self.population))
+            history.append((t, len(self.population)))
             last_time = t
 
         return history
@@ -440,10 +284,3 @@ class Simulador:
                     p.time_left_in_pregnancy = gest_time
                     
 
-# EJECUCION
-if __name__ == "__main__":
-
-    sim = Simulador(H=100, M=100)
-    history = sim.run(100)
-
-    print("Población final:", history[-1])
