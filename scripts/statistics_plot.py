@@ -14,6 +14,17 @@ if str(ROOT_DIR) not in sys.path:
 from scripts.simulation import Simulador
 
 
+def resolve_output_path(output: Path | None) -> Path | None:
+    """Resolve relative output paths inside the repository results folder."""
+    if output is None:
+        return None
+
+    if output.is_absolute():
+        return output
+
+    return ROOT_DIR / "results" / output.name
+
+
 def build_chart(male_count: int, female_count: int, years: int, output: Path | None) -> None:
     """Run the simulation and plot population growth over time."""
     simulation = Simulador(H=male_count, M=female_count)
@@ -53,7 +64,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("population_growth.png"),
+        default=Path("results") / "population_growth.png",
         help="Ruta del archivo PNG de salida. Usa una ruta vacía para mostrar la ventana.",
     )
     parser.add_argument(
@@ -66,5 +77,5 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
-    output_path = None if args.show else args.output
+    output_path = None if args.show else resolve_output_path(args.output)
     build_chart(args.hombres, args.mujeres, args.anios, output_path)
