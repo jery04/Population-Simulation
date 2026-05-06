@@ -3,7 +3,7 @@
 from typing import Optional  # Optional type hint for nullable partner references.
 from dataclasses import dataclass  # Dataclass decorator for the person record.
 
-# PERSON CLASS --------------------------
+# PERSON CLASS -------------------------------------------------
 @dataclass
 class Person:
     """Represents an individual in the population with demographic and social attributes."""

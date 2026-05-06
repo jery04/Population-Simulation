@@ -1,10 +1,11 @@
 """Random sampling helpers used by the population simulation."""
 
+import math    # Provides mathematical functions.
 import random  # Random number utilities for probabilistic sampling.
 from scripts.table import MEDIA_SOLO, prob_by_age  # Probability tables and lookup helper.
 
 
-# RANDOM SAMPLER --------------------------
+# RANDOM SAMPLER ---------------------------------------------
 class RandomSampler:
     """Utilities for random sampling from probability distributions."""
     
@@ -40,23 +41,37 @@ class RandomSampler:
 
     @staticmethod
     def sample_exponencial(lmbda):
-        """Sample from exponential distribution and convert months to years."""
-        # Sample from exponential distribution
-        if lmbda == 0:
+        """Sample from exponential distribution using inverse transform.
+        Returns time in years (assuming lambda is per month)."""
+
+        if lmbda <= 0:
             return 0
-        return random.expovariate(lmbda)/12  # Convert months to years
+
+        # Uniform(0,1)
+        u = random.random()
+
+        # Inverse transform: X = -ln(U) / lambda
+        x_months = -math.log(u) / lmbda
+
+        # Convert months → years
+        return x_months / 12
     
     @staticmethod
     def time_step(lam=1.5, min_dias=1, max_anos=5):
         """Return a random time jump (in years) sampled from an exponential
         distribution with rate `lam`, constrained to fall between `min_dias`
-        and `max_anos`."""
+        and `max_anos`, using inverse transform sampling."""
+
         # Convert constraints to years
         min_t = min_dias / 365
         max_t = max_anos
 
-        # Sample until we get a value within bounds
         while True:
-            dt = random.expovariate(lam)
+            # Uniform(0,1)
+            u = random.random()
+            # Inverse transform: X = -ln(U) / lambda
+            dt = -math.log(u) / lam
+
+            # Accept only if within bounds
             if min_t <= dt <= max_t:
                 return dt

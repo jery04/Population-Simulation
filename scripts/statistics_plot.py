@@ -7,6 +7,7 @@ import math
 from scripts.simulation import Simulador  # simulation engine
 
 ROOT_DIR = Path(__file__).resolve().parent.parent # Project root directory
+RESULTS_DIR = ROOT_DIR / "results"
 
 # UTILS -------------------------------------------------------------------
 METRICS = {
@@ -73,7 +74,7 @@ def build_ci_path(out_path: Path | None, metric: str) -> Path:
     if metric == "population":
         name = f"{base_stem}_confidence_interval"
     else:
-        name = f"{base_stem}_{metric}_confidence_interval"
+        name = f"{metric}_confidence_interval"
 
     return base_dir / f"{name}{suffix}"
 
@@ -116,7 +117,6 @@ def plot_ci_chart(
     fig.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=160, bbox_inches="tight", facecolor="white")
-    print(f"✓ 95% confidence interval chart saved to: {output_path}")
 
 def resolve_output_path(output: Path | None) -> Path | None:
     """Resolve relative output paths inside the repository results folder."""
@@ -230,7 +230,7 @@ def build_chart(
     if out_path is not None:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out_path, dpi=160, bbox_inches="tight", facecolor="white")
-        print(f"✓ Chart saved to: {out_path}")
+
 
     # If we ran multiple simulations, also save confidence interval plots for each metric.
     if runs > 1 and stats_by_metric is not None:
@@ -251,6 +251,8 @@ def build_chart(
                 color=meta["color"],
                 output_path=ci_path,
             )
+
+            print(f"✓ Chart saved to: {RESULTS_DIR}")
 
     if show or output is None:
         plt.show()

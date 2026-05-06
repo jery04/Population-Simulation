@@ -18,7 +18,7 @@ from scripts.table import (  # Probability tables and lookup helper.
 )
 
 
-# SIMULATOR ----------------------------------
+# SIMULATOR -------------------------------------------------
 class Simulador:
     """Main simulation engine for population dynamics."""
 
