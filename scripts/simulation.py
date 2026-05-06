@@ -30,6 +30,10 @@ class Simulador:
         self.female_group: set[int] = set()
         self.gestation: set[int] = set()
         self.next_id = 0
+        self.births = 0
+        self.deaths =0
+        self.pairs = 0
+        self.breaks =0
 
         # Create initial population of males and females
         for _ in range(H):
@@ -135,10 +139,16 @@ class Simulador:
         return eventos_globales
 
     def run(self, anos=100):
-        """Run the simulation and return the population history as list of (time, population)."""
-        
+        """Run the simulation and return the population and event counters over time."""
+
         # Initialize history tracker and event schedule
-        history: List[Tuple[float, int]] = [(0.0, len(self.population))]
+        history: dict[str, List[Tuple[float, int]]] = {
+            "population": [(0.0, len(self.population))],
+            "births": [(0.0, self.births)],
+            "deaths": [(0.0, self.deaths)],
+            "pairs": [(0.0, self.pairs)],
+            "breaks": [(0.0, self.breaks)],
+        }
         
         last_time = 0.0
         agenda_eventos = self.build_event_schedule(anos)
@@ -154,8 +164,12 @@ class Simulador:
             # Execute the current event handler
             funcion(diff)
             
-            # Record population size at this moment
-            history.append((t, len(self.population)))
+            # Record current totals at this moment
+            history["population"].append((t, len(self.population)))
+            history["births"].append((t, self.births))
+            history["deaths"].append((t, self.deaths))
+            history["pairs"].append((t, self.pairs))
+            history["breaks"].append((t, self.breaks))
             last_time = t
 
         return history
@@ -179,6 +193,7 @@ class Simulador:
                 # Add newborn to population groups
                 self.add_person (bebe)
                 self.gestation.discard(bebe.id)  # Remove from gestation tracking
+                self.births += 1
 
     # EVENT HANDLERS -------------------------------------------------------------------
     def handle_deaths(self, time):
@@ -190,6 +205,7 @@ class Simulador:
             if random.random() < prob_by_age(p.age, tabla):
                 # Mark person as deceased
                 p.is_alive = False
+                self.deaths += 1
 
                 # If deceased had a partner, end their relationship
                 if p.has_partner:
@@ -237,6 +253,7 @@ class Simulador:
                 if random.random() < p:
                     h.has_partner = m
                     m.has_partner = h
+                    self.pairs += 1
                     break  # Stop once the couple is formed
 
     def handle_breakups(self, time):
@@ -251,6 +268,7 @@ class Simulador:
                     # Sever relationship on both sides
                     p.has_partner = None
                     has_partner.has_partner = None
+                    self.breaks += 1
 
                     # Reset partnership desires and set solitude recovery period
                     p.desires_partner = False

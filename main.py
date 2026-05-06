@@ -7,7 +7,7 @@ from scripts.statistics_plot import build_chart, resolve_output_path  # Charting
 # MAIN --------------------------------------------------------------------
 def main():
     """Run the statistics plot flow with fixed parameters."""
-    output_path = resolve_output_path(Path("population_growth.png"))
+    output_path = resolve_output_path(Path("population_growth_standard_deviation.png"))
     final_pop = build_chart(
         male_count=100,
         female_count=100,
