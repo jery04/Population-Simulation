@@ -3,7 +3,7 @@
 from pathlib import Path  # filesystem paths
 import matplotlib.pyplot as plt  # chart rendering
 import statistics  # mean/stdev calculations
-import math
+import math        # imports Python’s standard mathematical functions and constants
 from scripts.simulation import Simulador  # simulation engine
 
 ROOT_DIR = Path(__file__).resolve().parent.parent # Project root directory
