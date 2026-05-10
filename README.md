@@ -127,17 +127,18 @@ print(mean_final_pop)
 
 ## In the terminal, you should observe an output similar to the following:
 
-<div style="background-color:black; color:white; padding:10px; font-family:Consolas, monospace;">
-Running 100 simulation runs (100 years each)...<br>
-&nbsp;&nbsp;Run 100/100... ✓<br>
-✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results<br>
-✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results<br>
-✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results<br>
-✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results<br>
-✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results<br><br>
+```md
+Running 100 simulation runs (100 years each)...
+  Run 100/100... ✓
+✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results
+✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results
+✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results
+✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results
+✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results
 
-<span style="color:lime;">Mean final population across runs: 667</span>
-</div>
+Mean final population across runs: 676
+```
+
 
 
 ## Notes 🧾
