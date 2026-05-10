@@ -202,7 +202,7 @@ class Simulador:
         for p in self.population:
             # Select appropriate mortality table by sex
             tabla = PROB_MUERTE_H if p.sex == 'H' else PROB_MUERTE_M
-            if random.random() < prob_by_age(p.age, tabla):
+            if random.random() < prob_by_age(p.age, tabla, is_death_table=True):
                 # Mark person as deceased
                 p.is_alive = False
                 self.deaths += 1

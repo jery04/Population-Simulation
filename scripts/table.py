@@ -1,20 +1,29 @@
 """Probability tables and age-based lookup utilities for the simulation."""
 
 
-def prob_by_age(age, tabla):
-    """Return the probability for an age range lookup table."""
-    # Look up probability based on age bracket
+def prob_by_age(age, tabla, is_death_table=False):
+    """
+    Return the probability for an age range lookup table.
+    If is_death_table=True, convert tramo probability to monthly probability.
+    """
     for a, b, p in tabla:
         if a <= age < b:
-            return p
+            if not is_death_table:
+                return p  # normal tables (embarazo, pareja, etc.)
+
+            # death table → convert tramo probability to monthly probability
+            months = (b - a) * 12
+            p_month = 1.0 - (1.0 - p) ** (1.0 / months)
+            return p_month
+
     return 0.0
 
 
 # Probability of death for males by age range (annualized rates)
-PROB_MUERTE_H = [(0,12,0.25/12),(12,45,0.1/12),(45,76,0.3/12),(76,126,0.7/12)]
+PROB_MUERTE_H = [(0,12,0.25),(12,45,0.1),(45,76,0.3),(76,126,0.7)]
 
 # Probability of death for females by age range (annualized rates)
-PROB_MUERTE_M = [(0,12,0.25/12),(12,45,0.15/12),(45,76,0.35/12),(76,126,0.65/12)]
+PROB_MUERTE_M = [(0,12,0.25),(12,45,0.15),(45,76,0.35),(76,126,0.65)]
 
 # Probability of pregnancy by age range
 PROB_EMBARAZO = [(12,15,0.2),(15,21,0.45),(21,35,0.8),(35,45,0.4),(45,60,0.2),(60,126,0.05)]
