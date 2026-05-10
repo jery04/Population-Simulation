@@ -2,7 +2,7 @@
 
 import math    # Provides mathematical functions.
 import random  # Random number utilities for probabilistic sampling.
-from scripts.table import MEDIA_SOLO, prob_by_age  # Probability tables and lookup helper.
+from scripts.tables import MEDIA_SOLO, prob_by_age  # Probability tables and lookup helper.
 
 
 # RANDOM SAMPLER ---------------------------------------------

@@ -4,7 +4,7 @@ import random  # Random number utilities for stochastic events.
 from typing import List, Tuple, Callable  # Type hints for schedules and callables.
 from scripts.person import Person  # Population entity model.
 from scripts.sampler import RandomSampler  # Random distribution sampling helpers.
-from scripts.table import (  # Probability tables and lookup helper.
+from scripts.tables import (  # Probability tables and lookup helper.
     PROB_MUERTE_H,
     PROB_MUERTE_M,
     PROB_EMBARAZO,
@@ -230,31 +230,53 @@ class Simulador:
 
     def match_couples(self, time):
         """Match available individuals who desire partnerships based on age compatibility."""
-        # Filter eligible single individuals seeking partners
-        male_group = [self.people[i] for i in self.male_group if self.people[i].is_single() and self.people[i].desires_partner]
-        female_group = [self.people[i] for i in self.female_group if self.people[i].is_single() and self.people[i].desires_partner]
 
-        # Randomize order to vary matching outcomes
+        # Filter eligible single individuals who want a partner
+        male_group = [
+            self.people[i] for i in self.male_group
+            if self.people[i].is_single() and self.people[i].desires_partner
+        ]
+
+        female_group = [
+            self.people[i] for i in self.female_group
+            if self.people[i].is_single() and self.people[i].desires_partner
+        ]
+
+        # If no women or no men, nothing to do
+        if not male_group or not female_group:
+            return
+
+        # Randomize both groups to avoid deterministic patterns
         random.shuffle(male_group)
         random.shuffle(female_group)
 
-        # Attempt to form couples based on age compatibility
+        # Try to form couples
         for h in male_group:
-            # Each male tries multiple candidates instead of only the first one
-            for m in female_group:
+
+            # Each male tries a random number of candidates (adds variability)
+            attempts = random.randint(1, min(10, len(female_group)))
+
+            # Select a random subset of female candidates
+            candidates = random.sample(female_group, attempts)
+
+            for m in candidates:
                 if not m.is_single():
                     continue
 
-                # Compute age difference and matching probability
+                # Compute age difference and base probability
                 diff = abs(h.age - m.age)
-                p = prob_by_age(diff, PROB_FORMAR_PAREJA)
+                base_p = prob_by_age(diff, PROB_FORMAR_PAREJA)
 
-                # Form couple if random check passes
+                # Add random noise to avoid repetitive outcomes
+                noise = random.uniform(0.8, 1.2)
+                p = min(1.0, base_p * noise)
+
+                # Attempt to form a couple
                 if random.random() < p:
                     h.has_partner = m
                     m.has_partner = h
                     self.pairs += 1
-                    break  # Stop once the couple is formed
+                    break
 
     def handle_breakups(self, time):
         """Randomly dissolve some partnerships and set solitude recovery time."""

@@ -125,6 +125,21 @@ mean_final_pop = build_chart(
 print(mean_final_pop)
 ```
 
+## In the terminal, you should observe an output similar to the following:
+
+<div style="background-color:black; color:white; padding:10px; font-family:Consolas, monospace;">
+Running 100 simulation runs (100 years each)...<br>
+&nbsp;&nbsp;Run 100/100... ✓<br>
+✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results<br>
+✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results<br>
+✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results<br>
+✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results<br>
+✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results<br><br>
+
+<span style="color:lime;">Mean final population across runs: 667</span>
+</div>
+
+
 ## Notes 🧾
 
 - The simulation is stochastic; results will vary run to run 🎲.
