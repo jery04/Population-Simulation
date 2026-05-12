@@ -26,13 +26,16 @@ Population Simulation/
 │   ├── sampler.py                  # 🎲 Random sampling & exponential time-steps
 │   ├── simulation.py               # ⚙️ Simulador engine (event scheduling & handlers)
 │   ├── statistics_plot.py          # 📊 Multi-run stats, plotting & output handling
-│   └── table.py                    # 📋 Probability tables & age-range lookup
+│   └── tables.py                   # 📋 Probability tables & age-range lookup
 │
-└── results/                         # 🖼️ Output charts (generated automatically)
+└── results/                        # 🖼️ Output charts (generated automatically)
     ├── population_growth_standard_deviation.png
     ├── population_growth_confidence_interval.png
     ├── births_confidence_interval.png
     ├── deaths_confidence_interval.png
+    ├── deaths_standard_deviation.png
+    ├── deaths_mean_std.png
+    ├── death_age_mean.png
     ├── pairs_confidence_interval.png
     └── breaks_confidence_interval.png
 ```
@@ -43,6 +46,9 @@ Results 🖼️ (saved in `results/`):
 - `population_growth_confidence_interval.png`: 95% confidence interval for population (when `--runs` > 1).
 - `births_confidence_interval.png`: 95% CI for cumulative births.
 - `deaths_confidence_interval.png`: 95% CI for cumulative deaths.
+- `deaths_standard_deviation.png`: Standard deviation of cumulative deaths over time (when `--runs` > 1).
+- `deaths_mean_std.png`: Mean ± 1 standard deviation bands for cumulative deaths (when `--runs` > 1).
+- `death_age_mean.png`: Average deaths per age interval (0-12, 12-45, 45-76, 76+).
 - `pairs_confidence_interval.png`: 95% CI for cumulative pairs formed.
 - `breaks_confidence_interval.png`: 95% CI for cumulative breakups.
 
@@ -136,7 +142,7 @@ Running 100 simulation runs (100 years each)...
 ✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results
 ✓ Chart saved to: D:\Cybernetics\Proyectos\Population Simulation\results
 
-Mean final population across runs: 676
+Mean final population across runs: 470
 ```
 
 
