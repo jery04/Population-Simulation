@@ -31,7 +31,9 @@ class Simulador:
         self.gestation: set[int] = set()
         self.next_id = 0
         self.births = 0
-        self.deaths =0
+        self.deaths = 0
+        # Record ages at death for histogramming / analysis
+        self.death_ages: list[float] = []
         self.pairs = 0
         self.breaks =0
 
@@ -206,6 +208,12 @@ class Simulador:
                 # Mark person as deceased
                 p.is_alive = False
                 self.deaths += 1
+                # Record the age at death for later analysis/histograms
+                try:
+                    self.death_ages.append(float(p.age))
+                except Exception:
+                    # Fallback: ignore if age not numeric
+                    pass
 
                 # If deceased had a partner, end their relationship
                 if p.has_partner:
