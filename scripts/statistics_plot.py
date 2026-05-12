@@ -20,21 +20,25 @@ METRICS = {
 
 def build_timeline(years: int) -> list[int]:
     """Build a yearly grid for resampling."""
+    # Create an inclusive year axis: 0..years.
     return list(range(0, years + 1))
 
 def resample_series(history: list[tuple[float, int]], timeline: list[int]) -> list[int]:
     """Resample a history series on a shared yearly grid using last-known values."""
     if not history:
+        # No events: keep the full series at zero.
         return [0] * len(timeline)
 
     values: list[int] = []
     idx = 0
+    # Start from the first observed value.
     current_value = history[0][1]
     for year in timeline:
-        # Advance through history until we reach the current year.
+        # Move forward while events are inside this year bucket.
         while idx < len(history) and history[idx][0] <= year:
             current_value = history[idx][1]
             idx += 1
+        # Hold the latest known value for this timeline step.
         values.append(current_value)
 
     return values
@@ -44,14 +48,19 @@ def compute_series_stats(
     runs: int,
 ) -> tuple[list[float], list[float], list[float], list[float]]:
     """Compute mean, stdev, and 95% confidence bounds across runs."""
+    # Group values by year across all simulation runs.
     per_year = list(zip(*all_series))
+    # Central tendency per year.
     means = [statistics.mean(col) for col in per_year]
+    # Population stdev per year (not sample stdev).
     stdevs = [statistics.pstdev(col) for col in per_year]
 
     # 95% confidence interval for the mean (approx normal assumption)
     # margin = z * (sigma / sqrt(n)), z ~ 1.96 for 95%
     z95 = 1.96
+    # CI half-width for each year.
     margins95 = [z95 * (s / math.sqrt(runs)) for s in stdevs]
+    # Lower and upper confidence bounds.
     lower95 = [m - d for m, d in zip(means, margins95)]
     upper95 = [m + d for m, d in zip(means, margins95)]
 
@@ -60,10 +69,12 @@ def compute_series_stats(
 def build_ci_path(out_path: Path | None, metric: str) -> Path:
     """Build a 95% confidence interval output path for the given metric."""
     if out_path is not None:
+        # Reuse the caller-provided directory and extension.
         base_dir = out_path.parent
         base_stem = out_path.stem
         suffix = out_path.suffix
     else:
+        # Fallback path when no output file was provided.
         base_dir = ROOT_DIR / "results"
         base_stem = "population_growth"
         suffix = ".png"
@@ -72,8 +83,10 @@ def build_ci_path(out_path: Path | None, metric: str) -> Path:
         base_stem = base_stem[: -len("_standard_deviation")]
 
     if metric == "population":
+        # Keep historical filename convention for population.
         name = f"{base_stem}_confidence_interval"
     else:
+        # Metric-specific confidence chart naming.
         name = f"{metric}_confidence_interval"
 
     return base_dir / f"{name}{suffix}"
@@ -81,10 +94,12 @@ def build_ci_path(out_path: Path | None, metric: str) -> Path:
 def build_std_path(out_path: Path | None, metric: str) -> Path:
     """Build a standard-deviation output path for the given metric."""
     if out_path is not None:
+        # Reuse the caller-provided directory and extension.
         base_dir = out_path.parent
         base_stem = out_path.stem
         suffix = out_path.suffix
     else:
+        # Fallback path when no output file was provided.
         base_dir = ROOT_DIR / "results"
         base_stem = "population_growth"
         suffix = ".png"
@@ -94,8 +109,10 @@ def build_std_path(out_path: Path | None, metric: str) -> Path:
         base_stem = base_stem[: -len("_standard_deviation")]
 
     if metric == "population":
+        # Keep historical filename convention for population.
         name = f"{base_stem}_standard_deviation"
     else:
+        # Metric-specific std chart naming.
         name = f"{metric}_standard_deviation"
 
     return base_dir / f"{name}{suffix}"
@@ -103,16 +120,19 @@ def build_std_path(out_path: Path | None, metric: str) -> Path:
 def build_death_age_mean_path(out_path: Path | None) -> Path:
     """Build an output path for the deaths-by-age mean/counts chart."""
     if out_path is not None:
+        # Reuse the caller-provided directory and extension.
         base_dir = out_path.parent
         base_stem = out_path.stem
         suffix = out_path.suffix
     else:
+        # Fallback path when no output file was provided.
         base_dir = ROOT_DIR / "results"
         base_stem = "population_growth"
         suffix = ".png"
 
     # Remove any known output suffixes to avoid double-suffixing
     for sfx in ("_death_age_histogram", "_death_age_mean", "_standard_deviation", "_confidence_interval", "_mean_std"):
+        # Normalize base stem before appending a new suffix.
         if base_stem.endswith(sfx):
             base_stem = base_stem[: -len(sfx)]
 
@@ -130,9 +150,11 @@ def plot_avg_death_counts(
 ) -> None:
     """Render and save a bar chart of average deaths per age interval."""
     if not mean_counts or not labels or len(mean_counts) != len(labels):
+        # Guard against empty or inconsistent input arrays.
         return
 
     fig, ax = plt.subplots(figsize=(10, 6))
+    # Build one bar per age interval label.
     x = range(len(labels))
     bars = ax.bar(x, mean_counts, color=color, alpha=0.9, edgecolor="black")
 
@@ -156,6 +178,7 @@ def plot_avg_death_counts(
     ax.set_ylabel(ylabel, fontsize=11, fontweight="bold")
     ax.grid(True, linestyle="--", alpha=0.25, linewidth=0.6)
     fig.tight_layout()
+    # Ensure destination folder exists before writing.
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=160, bbox_inches="tight", facecolor="white")
 
@@ -171,6 +194,7 @@ def plot_ci_chart(
 ) -> None:
     """Render and save a 95% confidence interval chart."""
     fig, ax = plt.subplots(figsize=(12, 7))
+    # Plot mean trajectory and confidence envelope.
     ax.plot(timeline, means, color=color, linewidth=2.8, label="Mean")
     ax.fill_between(timeline, lower95, upper95, color=color, alpha=0.25, label="95% confidence interval")
 
@@ -196,6 +220,7 @@ def plot_ci_chart(
     ax.grid(True, linestyle="--", alpha=0.3, linewidth=0.7)
     ax.legend(fontsize=11, loc="best", framealpha=0.95)
     fig.tight_layout()
+    # Ensure destination folder exists before writing.
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=160, bbox_inches="tight", facecolor="white")
 
@@ -209,7 +234,9 @@ def plot_std_chart(
 ) -> None:
     """Render and save a standard-deviation chart for a metric."""
     fig, ax = plt.subplots(figsize=(12, 7))
+    # Plot yearly standard deviation curve.
     ax.plot(timeline, stdevs, color=color, linewidth=2.8, label="Standard deviation")
+    # Fill from zero for a quick magnitude read.
     ax.fill_between(timeline, [0] * len(stdevs), stdevs, color=color, alpha=0.12)
 
     final_std = stdevs[-1] if stdevs else 0
@@ -232,16 +259,19 @@ def plot_std_chart(
     ax.grid(True, linestyle="--", alpha=0.3, linewidth=0.7)
     ax.legend(fontsize=11, loc="best", framealpha=0.95)
     fig.tight_layout()
+    # Ensure destination folder exists before writing.
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=160, bbox_inches="tight", facecolor="white")
 
 def build_meanstd_path(out_path: Path | None, metric: str) -> Path:
     """Build an output path for the mean ± standard-deviation chart for a metric."""
     if out_path is not None:
+        # Reuse the caller-provided directory and extension.
         base_dir = out_path.parent
         base_stem = out_path.stem
         suffix = out_path.suffix
     else:
+        # Fallback path when no output file was provided.
         base_dir = ROOT_DIR / "results"
         base_stem = "population_growth"
         suffix = ".png"
@@ -250,8 +280,10 @@ def build_meanstd_path(out_path: Path | None, metric: str) -> Path:
         base_stem = base_stem[: -len("_mean_std")]
 
     if metric == "population":
+        # Keep historical filename convention for population.
         name = f"{base_stem}_mean_std"
     else:
+        # Metric-specific mean/std chart naming.
         name = f"{metric}_mean_std"
 
     return base_dir / f"{name}{suffix}"
@@ -268,8 +300,10 @@ def plot_mean_std_chart(
 ) -> None:
     """Render and save a mean series with ±sigma*std deviation bands."""
     fig, ax = plt.subplots(figsize=(12, 7))
+    # Plot mean trajectory.
     ax.plot(timeline, means, color=color, linewidth=2.8, label="Mean")
 
+    # Compute lower/upper sigma band around the mean.
     lower = [m - sigma * s for m, s in zip(means, stdevs)]
     upper = [m + sigma * s for m, s in zip(means, stdevs)]
 
@@ -296,15 +330,18 @@ def plot_mean_std_chart(
     ax.grid(True, linestyle="--", alpha=0.3, linewidth=0.7)
     ax.legend(fontsize=11, loc="best", framealpha=0.95)
     fig.tight_layout()
+    # Ensure destination folder exists before writing.
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=160, bbox_inches="tight", facecolor="white")
 
 def resolve_output_path(output: Path | None) -> Path | None:
     """Resolve relative output paths inside the repository results folder."""
     if output is None:
+        # Keep None untouched when caller requested display-only mode.
         return None
 
     if output.is_absolute():
+        # Absolute paths are respected as-is.
         return output
 
     # Keep relative outputs inside results/.
@@ -336,13 +373,16 @@ def build_chart(
     out_path = resolve_output_path(output) if output is not None else None
 
     stats_by_metric: dict[str, tuple[list[float], list[float], list[float], list[float]]] | None = None
+    # Timeline can be event-based (single run) or yearly (multi-run).
     timeline: list[float] | list[int]
 
     if runs <= 1:
         # Single run keeps the original event timeline.
         simulation = Simulador(H=male_count, M=female_count)
+        # Run simulation and collect event history.
         history = simulation.run(years)
         population_history = history["population"]
+        # Store final population for return value.
         final_populations.append(population_history[-1][1] if population_history else 0)
         timeline = [t for t, _ in population_history]
         population = [p for _, p in population_history]
@@ -353,8 +393,11 @@ def build_chart(
         # Capture death ages from this single simulation run for histogramming
         single_run_death_ages = getattr(simulation, "death_ages", [])
     else:
+        # Store per-run resampled series for each tracked metric.
         all_series: dict[str, list[list[float]]] = {key: [] for key in METRICS}
+        # Keep all death ages in case additional analyses are needed.
         all_death_ages: list[float] = []
+        # Keep per-run death counts by age bucket.
         per_run_counts: list[list[int]] = []
         interval_labels = ["0-12", "12-45", "45-76", "76+"]
         timeline = build_timeline(years)
@@ -380,10 +423,12 @@ def build_chart(
             final_populations.append(population_history[-1][1] if population_history else 0)
 
             for key in METRICS:
+                # Resample each metric to the shared yearly timeline.
                 series = resample_series(history[key], timeline)
                 all_series[key].append(series)
         print(f"  Run {runs}/{runs}... ✓")
 
+        # Compute mean/stdev/CI for every tracked metric.
         stats_by_metric = {key: compute_series_stats(all_series[key], runs) for key in METRICS}
         # Compute average death counts per interval across runs
         mean_death_counts = []
@@ -406,6 +451,7 @@ def build_chart(
         else:
             # Plot mean with standard deviation bands.
             ax.plot(timeline, means, color="#1f77b4", linewidth=2.8, label=f"Mean ({runs} runs)")
+            # Build sigma envelope around the mean.
             lower = [m - sigma * s for m, s in zip(means, stdevs)]
             upper = [m + sigma * s for m, s in zip(means, stdevs)]
             ax.fill_between(
@@ -434,6 +480,7 @@ def build_chart(
 
     # Use resolved path (keeps results/ as the place for relative outputs).
     if out_path is not None:
+        # Save the main population chart.
         out_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out_path, dpi=160, bbox_inches="tight", facecolor="white")
         # Save average deaths per interval for a single run (if available)
@@ -446,6 +493,7 @@ def build_chart(
                 sum(1 for a in single_run_death_ages if a > 76),
             ]
             mean_path = build_death_age_mean_path(out_path)
+            # Save per-interval death counts for this run.
             plot_avg_death_counts(
                 mean_counts=run_counts,
                 labels=interval_labels,
@@ -461,6 +509,7 @@ def build_chart(
     # If we ran multiple simulations, also save confidence interval plots for each metric.
     if runs > 1 and stats_by_metric is not None:
         for key, meta in METRICS.items():
+            # Export one CI chart per metric.
             means, _, lower95, upper95 = stats_by_metric[key]
             ci_path = build_ci_path(out_path, key)
             if key == "population":
@@ -482,6 +531,7 @@ def build_chart(
 
         # Additionally, save a standard-deviation chart for deaths specifically.
         if "deaths" in stats_by_metric:
+            # Export deaths variability chart.
             _, stdevs_deaths, _, _ = stats_by_metric["deaths"]
             std_path = build_std_path(out_path, "deaths")
             std_title = f"Deaths - Standard Deviation ({runs} runs, {years} years)"
@@ -514,6 +564,7 @@ def build_chart(
             # Mean death counts per interval across runs (average per run)
             try:
                 mean_path = build_death_age_mean_path(out_path)
+                # Export average deaths for each age bucket.
                 plot_avg_death_counts(
                     mean_counts=mean_death_counts,
                     labels=interval_labels,
@@ -530,6 +581,8 @@ def build_chart(
             # (Aggregated histogram generation removed; average-per-interval saved above.)
 
     if show or output is None:
+        # Show plot in interactive mode when requested.
         plt.show()
 
+    # Return the average final population across runs.
     return statistics.mean(final_populations) if final_populations else 0.0
