@@ -11,9 +11,7 @@ def prob_by_age(age, tabla, is_death_table=False):
             if not is_death_table:
                 return p  # normal tables (embarazo, pareja, etc.)
             
-            # death table → convert tramo probability to monthly probability
-            months = (b - a) * 12
-            p_month = 1.0 - (1.0 - p) ** (1.0 / months)
+            # death table → convert tramo probability to year probability
             return p / (b-a)
 
     return 0.0
