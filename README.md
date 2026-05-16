@@ -24,7 +24,7 @@ Population Simulation/
 ├── scripts/                        # 🛠️ Core simulation modules
 │   ├── person.py                   # 👤 Person data model (age, sex, partner, fertility)
 │   ├── sampler.py                  # 🎲 Random sampling & exponential time-steps
-│   ├── simulation.py               # ⚙️ Simulador engine (event scheduling & handlers)
+│   ├── simulation.py               # ⚙️ Simulator engine (event scheduling & handlers)
 │   ├── statistics_plot.py          # 📊 Multi-run stats, plotting & output handling
 │   └── tables.py                   # 📋 Probability tables & age-range lookup
 │

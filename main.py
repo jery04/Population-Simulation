@@ -2,7 +2,7 @@
 
 import argparse
 from pathlib import Path  # File system path helpers.
-from scripts.simulation import Simulador  # Main simulation engine.
+from scripts.simulation import Simulator  # Main simulation engine.
 from scripts.statistics_plot import build_chart, resolve_output_path  # Charting and output path utilities.
 
 # MAIN --------------------------------------------------------------------

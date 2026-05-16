@@ -4,7 +4,7 @@ from pathlib import Path  # filesystem paths
 import matplotlib.pyplot as plt  # chart rendering
 import statistics  # mean/stdev calculations
 import math        # imports Python’s standard mathematical functions and constants
-from scripts.simulation import Simulador  # simulation engine
+from scripts.simulation import Simulator  # simulation engine
 
 ROOT_DIR = Path(__file__).resolve().parent.parent # Project root directory
 RESULTS_DIR = ROOT_DIR / "results"
@@ -449,7 +449,7 @@ def build_chart(
 
     if runs <= 1:
         # Single run keeps the original event timeline.
-        simulation = Simulador(H=male_count, M=female_count)
+        simulation = Simulator(H=male_count, M=female_count)
         # Run simulation and collect event history.
         history = simulation.run(years)
         population_history = history["population"]
@@ -479,7 +479,7 @@ def build_chart(
 
         for i in range(runs):
             print(f"  Run {i+1}/{runs}...", end="\r")
-            sim = Simulador(H=male_count, M=female_count)
+            sim = Simulator(H=male_count, M=female_count)
             history = sim.run(years)
             # collect ages at death from this run
             run_death_ages = getattr(sim, "death_ages", [])

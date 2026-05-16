@@ -19,7 +19,7 @@ from scripts.tables import (  # Probability tables and lookup helper.
 
 
 # SIMULATOR -------------------------------------------------
-class Simulador:
+class Simulator:
     """Main simulation engine for population dynamics."""
 
     def __init__(self, H, M):
