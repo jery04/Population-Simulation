@@ -18,6 +18,9 @@ METRICS = {
     "breaks": {"label": "Breakups", "ylabel": "Cumulative breakups", "color": "#8c564b"},
 }
 
+# Births histogram interval (years).
+BIRTH_INTERVAL_YEARS = 20
+
 def build_timeline(years: int) -> list[int]:
     """Build a yearly grid for resampling."""
     # Create an inclusive year axis: 0..years.
@@ -138,6 +141,73 @@ def build_death_age_mean_path(out_path: Path | None) -> Path:
 
     name = f"{base_stem}_death_age_mean"
     return base_dir / f"{name}{suffix}"
+
+def build_births_interval_path(out_path: Path | None, interval_years: int) -> Path:
+    """Build an output path for the births-per-interval histogram."""
+    if out_path is not None:
+        base_dir = out_path.parent
+        base_stem = out_path.stem
+        suffix = out_path.suffix
+    else:
+        base_dir = ROOT_DIR / "results"
+        base_stem = "population_growth"
+        suffix = ".png"
+
+    for sfx in (
+        "_births_interval",
+        "_births_histogram",
+        "_standard_deviation",
+        "_confidence_interval",
+        "_mean_std",
+        "_death_age_mean",
+    ):
+        if base_stem.endswith(sfx):
+            base_stem = base_stem[: -len(sfx)]
+
+    name = f"{base_stem}_births_interval_{interval_years}y"
+    return base_dir / f"{name}{suffix}"
+
+def build_interval_edges(years: int, interval_years: int) -> list[int]:
+    """Build interval edges in years, ensuring the last edge equals years."""
+    if interval_years <= 0:
+        return [0, years]
+    edges = list(range(0, years + 1, interval_years))
+    if not edges:
+        return [0, years]
+    if edges[-1] != years:
+        edges.append(years)
+    return edges
+
+def build_interval_labels(edges: list[int]) -> list[str]:
+    """Build labels like 0-20, 20-40 for each interval edge pair."""
+    labels: list[str] = []
+    for start, end in zip(edges[:-1], edges[1:]):
+        labels.append(f"{start}-{end}")
+    return labels
+
+def compute_interval_counts(series: list[float], edges: list[int]) -> list[float]:
+    """Compute per-interval counts from a cumulative yearly series."""
+    counts: list[float] = []
+    for start, end in zip(edges[:-1], edges[1:]):
+        start_val = series[start] if start < len(series) else series[-1]
+        end_val = series[end] if end < len(series) else series[-1]
+        counts.append(max(0.0, end_val - start_val))
+    return counts
+
+def compute_mean_interval_counts(
+    per_run_series: list[list[float]],
+    years: int,
+    interval_years: int,
+) -> tuple[list[float], list[str]]:
+    """Compute mean counts per interval and labels across runs."""
+    edges = build_interval_edges(years, interval_years)
+    labels = build_interval_labels(edges)
+    if not per_run_series or len(edges) < 2:
+        return [0.0] * max(0, len(edges) - 1), labels
+
+    per_run_counts = [compute_interval_counts(series, edges) for series in per_run_series]
+    means = [statistics.mean(col) for col in zip(*per_run_counts)]
+    return means, labels
 
 def plot_avg_death_counts(
     mean_counts: list[float],
@@ -368,6 +438,7 @@ def build_chart(
     """
 
     final_populations: list[int] = []
+    births_series_by_run: list[list[float]] = []
 
     # Resolve output inside results/ when a relative path is provided.
     out_path = resolve_output_path(output) if output is not None else None
@@ -386,6 +457,9 @@ def build_chart(
         final_populations.append(population_history[-1][1] if population_history else 0)
         timeline = [t for t, _ in population_history]
         population = [p for _, p in population_history]
+
+        yearly_timeline = build_timeline(years)
+        births_series_by_run = [resample_series(history["births"], yearly_timeline)]
 
         fig, ax = plt.subplots(figsize=(12, 7))
         ax.plot(timeline, population, color="#1f77b4", linewidth=2.5, label="Population")
@@ -439,6 +513,8 @@ def build_chart(
             mean_death_counts = [0.0] * len(interval_labels)
 
         means, stdevs, _, _ = stats_by_metric["population"]
+
+        births_series_by_run = all_series.get("births", [])
 
         fig, ax = plt.subplots(figsize=(12, 7))
 
@@ -504,6 +580,30 @@ def build_chart(
                 output_path=mean_path,
             )
             print(f"✓ Average deaths per interval saved to: {mean_path}")
+
+        # Save average births per interval across runs (or single run).
+        try:
+            mean_birth_counts, interval_labels = compute_mean_interval_counts(
+                births_series_by_run,
+                years=years,
+                interval_years=BIRTH_INTERVAL_YEARS,
+            )
+            births_path = build_births_interval_path(out_path, BIRTH_INTERVAL_YEARS)
+            plot_avg_death_counts(
+                mean_counts=mean_birth_counts,
+                labels=interval_labels,
+                title=(
+                    f"Average births per {BIRTH_INTERVAL_YEARS}-year interval "
+                    f"({runs} {'run' if runs == 1 else 'runs'}, {years} years)"
+                ),
+                xlabel="Year interval",
+                ylabel="Average births per run",
+                color=METRICS["births"]["color"],
+                output_path=births_path,
+            )
+            print(f"✓ Average births per interval saved to: {births_path}")
+        except Exception:
+            pass
 
 
     # If we ran multiple simulations, also save confidence interval plots for each metric.
