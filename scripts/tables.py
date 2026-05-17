@@ -39,7 +39,7 @@ PROB_RUPTURA = 0.2
 MEDIA_SOLO = [(12,15,3),(15,21,6),(21,35,6),(35,45,12),(45,60,24),(60,126,48)]
 
 # Raw distribution of number of babies per pregnancy (weights)
-_bebes_raw = {1:0.7,2:0.18,3:0.08,4:0.04,5:0.02}
+_bebes_raw = {1:0.7,2:0.18,3:0.08,4:0.04,5:0.02,6:0.01,7:0.01,8:0.01}
 
 # Normalize so probabilities sum exactly to 1.0
 _bebes_total = sum(_bebes_raw.values())
